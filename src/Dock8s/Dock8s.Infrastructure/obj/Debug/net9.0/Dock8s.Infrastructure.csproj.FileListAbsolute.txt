@@ -1,0 +1,11 @@
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\bin\Debug\net9.0\Dock8s.Infrastructure.deps.json
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\bin\Debug\net9.0\Dock8s.Infrastructure.dll
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\bin\Debug\net9.0\Dock8s.Infrastructure.pdb
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.AssemblyInfoInputs.cache
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.AssemblyInfo.cs
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.csproj.CoreCompileInputs.cache
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.dll
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\refint\Dock8s.Infrastructure.dll
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.pdb
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\ref\Dock8s.Infrastructure.dll
