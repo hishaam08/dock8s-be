@@ -37,3 +37,4 @@ D:\dock8s\dock8s-be\src\Dock8s\Dock8s.API\obj\Debug\net9.0\refint\Dock8s.API.dll
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.API\obj\Debug\net9.0\Dock8s.API.pdb
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.API\obj\Debug\net9.0\Dock8s.API.genruntimeconfig.cache
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.API\obj\Debug\net9.0\ref\Dock8s.API.dll
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.API\obj\Debug\net9.0\Dock8s.API.sourcelink.json

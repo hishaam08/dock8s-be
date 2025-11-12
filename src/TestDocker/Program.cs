@@ -82,7 +82,7 @@ class Program
     static async Task Main()
     {
         // Adjust this to match your backend URL
-        var hubUrl = "http://localhost:5295/terminalHub";
+        var hubUrl = "https://api.dock8s.in/terminalHub";
 
         var connection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
@@ -99,7 +99,7 @@ class Program
 
         Console.WriteLine($"Connecting to {hubUrl}...");
         await connection.StartAsync();
-        Console.WriteLine("✅ Connected to SignalR TerminalHub\n");
+        Console.WriteLine("Connected to SignalR TerminalHub\n");
 
         // Attach to a running container
         Console.Write("Enter container ID: ");
@@ -117,8 +117,8 @@ class Program
             await connection.InvokeAsync("SendInput", cmd + "\n");
         }
 
-        Console.WriteLine("🔒 Closing connection...");
+        Console.WriteLine("Closing connection...");
         await connection.StopAsync();
-        Console.WriteLine("✅ Connection closed.");
+        Console.WriteLine("Connection closed.");
     }
 }

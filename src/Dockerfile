@@ -5,7 +5,6 @@ WORKDIR /app
 # Copy the .csproj files and restore dependencies
 COPY Dock8s/Dock8s.API/*.csproj ./Dock8s/Dock8s.API/
 COPY Dock8s/Dock8s.Application/*.csproj ./Dock8s/Dock8s.Application/
-COPY Dock8s/Dock8s.Domain/*.csproj ./Dock8s/Dock8s.Domain/
 COPY Dock8s/Dock8s.Infrastructure/*.csproj ./Dock8s/Dock8s.Infrastructure/
 
 # Restore the dependencies

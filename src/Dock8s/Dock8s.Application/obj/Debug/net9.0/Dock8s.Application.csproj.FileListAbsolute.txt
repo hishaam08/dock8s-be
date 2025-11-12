@@ -10,3 +10,4 @@ D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Application\obj\Debug\net9.0\Dock8s.Applic
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Application\obj\Debug\net9.0\refint\Dock8s.Application.dll
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Application\obj\Debug\net9.0\Dock8s.Application.pdb
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Application\obj\Debug\net9.0\ref\Dock8s.Application.dll
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Application\obj\Debug\net9.0\Dock8s.Application.sourcelink.json
