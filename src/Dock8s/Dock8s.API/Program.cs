@@ -2,12 +2,23 @@ using Dock8s.Application.SignalRHub;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
+
+var allowedOrigins = new[]
+{
+    "https://dock8s.in",
+    "https://www.dock8s.in",
+    "http://localhost:3000"
+};
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -16,9 +27,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseRouting();
 app.UseCors("AllowFrontend");
 
-// Map SignalR hub
-app.MapHub<TerminalHub>("/terminalhub");
+app.MapHub<TerminalHub>("/terminalhub").RequireCors("AllowFrontend");
 
 app.Run();

@@ -35,7 +35,9 @@ namespace Dock8s.Application.SignalRHub
                     Env = new[]
                     {
                         "TERM=xterm-256color",
-                        "PS1=\\u@\\h:\\w\\$ " // Set a clear prompt
+                        "LANG=C.UTF-8",
+                        "PS1=\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ ",
+                        "LS_OPTIONS=--color=auto"
                     }
                 });
 
@@ -100,6 +102,8 @@ namespace Dock8s.Application.SignalRHub
                         }
                         _execIds.TryRemove(connectionId, out _);
                         _cancellationTokens.TryRemove(connectionId, out _);
+
+                        await caller.SendAsync("StreamClosed", "EOF");
                     }
                 }, cts.Token);
 
