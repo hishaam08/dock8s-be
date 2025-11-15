@@ -1,0 +1,499 @@
+using Docker.DotNet;
+using Docker.DotNet.Models;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace Dock8s.API.Controllers
+{
+    // ============= MODELS =============
+    public class ExposeRequest
+    {
+        public string UserId { get; set; }
+        public int Port { get; set; }
+        public string? Subdomain { get; set; } // Optional custom subdomain
+    }
+
+    public class RouteInfo
+    {
+        public string Id { get; set; }
+        public string Subdomain { get; set; }
+        public string Hostname { get; set; }
+        public string Port { get; set; }
+        public string ContainerId { get; set; }
+        public string UserId { get; set; }
+        public string Status { get; set; }
+        public string Url { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class RouteResponse
+    {
+        public string Url { get; set; }
+        public string Hostname { get; set; }
+        public string RouteId { get; set; }
+        public string Status { get; set; }
+    }
+
+    // ============= TRAEFIK FILE ROUTER SERVICE =============
+    public class TraefikFileRouterService
+    {
+        private readonly DockerClient _dockerClient;
+        private readonly string _domain;
+        private readonly string _dynamicConfigPath;
+        private readonly string _routesDbPath;
+        private readonly bool _useHttps;
+        private const string TRAEFIK_NETWORK = "traefik-public";
+
+        public TraefikFileRouterService(
+            string dockerHost = "tcp://localhost:2375",
+            string domain = "dock8s.in",
+            string dynamicConfigPath = "./dynamic",
+            bool useHttps = true)
+        {
+            _dockerClient = new DockerClientConfiguration(new Uri(dockerHost)).CreateClient();
+            _domain = domain;
+            _dynamicConfigPath = dynamicConfigPath;
+            _routesDbPath = Path.Combine(_dynamicConfigPath, "routes.json");
+            _useHttps = useHttps;
+
+            // Ensure directories exist
+            Directory.CreateDirectory(_dynamicConfigPath);
+            
+            if (!File.Exists(_routesDbPath))
+            {
+                File.WriteAllText(_routesDbPath, "[]");
+            }
+        }
+
+        public async Task<RouteInfo> ExposePortAsync(ExposeRequest request)
+        {
+            // Validate port
+            if (request.Port < 1 || request.Port > 65535)
+            {
+                throw new ArgumentException("Invalid port number. Must be between 1 and 65535.");
+            }
+
+            // Sanitize userId
+            var safeUserId = SanitizeString(request.UserId);
+            
+            // Generate route ID and hostname
+            string routeId;
+            string hostname;
+            
+            if (!string.IsNullOrEmpty(request.Subdomain))
+            {
+                // Custom subdomain
+                var safeSubdomain = SanitizeString(request.Subdomain);
+                routeId = $"{safeSubdomain}-{safeUserId}";
+                hostname = $"{safeSubdomain}.{safeUserId}.{_domain}";
+            }
+            else
+            {
+                // Port-based subdomain
+                routeId = $"p{request.Port}-{safeUserId}";
+                hostname = $"p{request.Port}.{safeUserId}.{_domain}";
+            }
+
+            // Check if route already exists
+            var existingRoutes = await GetRoutesAsync(request.UserId);
+            if (existingRoutes.Any(r => r.Hostname == hostname))
+            {
+                throw new InvalidOperationException($"Route for {hostname} already exists.");
+            }
+
+            // Get container ID for user
+            var containerId = $"{safeUserId}-dind";
+            
+            // Verify container exists and is running
+            var containerExists = await VerifyContainerAsync(containerId);
+            if (!containerExists)
+            {
+                throw new InvalidOperationException($"Container {containerId} not found or not running.");
+            }
+
+            // Ensure container is connected to Traefik network
+            await EnsureContainerNetworkAsync(containerId);
+
+            // Generate Traefik YAML configuration
+            var configPath = Path.Combine(_dynamicConfigPath, $"{routeId}.yml");
+            await GenerateTraefikConfigAsync(routeId, hostname, request.Port, safeUserId, configPath);
+
+            // Save route to database
+            var route = new RouteInfo
+            {
+                Id = routeId,
+                Subdomain = request.Subdomain ?? $"p{request.Port}",
+                Hostname = hostname,
+                Port = request.Port.ToString(),
+                ContainerId = containerId,
+                UserId = request.UserId,
+                Status = "active",
+                Url = $"{(_useHttps ? "https" : "http")}://{hostname}",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await SaveRouteToDbAsync(route);
+
+            Console.WriteLine($"✅ Route exposed: {hostname} → {containerId}:{request.Port}");
+
+            return route;
+        }
+
+        private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
+        {
+            var containerName = $"{userId}-dind";
+            var protocol = _useHttps ? "https" : "http";
+            var entryPoint = _useHttps ? "websecure" : "web";
+
+            var yaml = $@"http:
+  routers:
+    r-{routeId}:
+      rule: ""Host(`{hostname}`)""
+      service: ""s-{routeId}""
+      entryPoints:
+        - {entryPoint}";
+
+            if (_useHttps)
+            {
+                yaml += @"
+      tls:
+        certResolver: letsencrypt";
+            }
+
+            yaml += $@"
+
+  services:
+    s-{routeId}:
+      loadBalancer: 
+        servers:
+          - url: ""http://{containerName}:{port}""
+";
+
+            await File.WriteAllTextAsync(filePath, yaml);
+            Console.WriteLine($"📝 Traefik config written: {filePath}");
+        }
+
+        public async Task<bool> DeleteRouteAsync(string routeId, string userId)
+        {
+            var safeUserId = SanitizeString(userId);
+            
+            // Load route from database
+            var route = await GetRouteByIdAsync(routeId, userId);
+            if (route == null)
+            {
+                return false;
+            }
+
+            var configPath = Path.Combine(_dynamicConfigPath, $"{routeId}.yml");
+            if (File.Exists(configPath))
+            {
+                File.Delete(configPath);
+                Console.WriteLine($"🗑️  Deleted config: {configPath}");
+            }
+
+            await RemoveRouteFromDbAsync(routeId);
+
+            Console.WriteLine($"✅ Route deleted: {routeId}");
+            return true;
+        }
+
+        public async Task<List<RouteInfo>> GetRoutesAsync(string userId = null)
+        {
+            var json = await File.ReadAllTextAsync(_routesDbPath);
+            var routes = JsonSerializer.Deserialize<List<RouteInfo>>(json) ?? new List<RouteInfo>();
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                routes = routes.Where(r => r.UserId == userId).ToList();
+            }
+
+            return routes;
+        }
+
+        public async Task<RouteInfo> GetRouteByIdAsync(string routeId, string userId = null)
+        {
+            var routes = await GetRoutesAsync(userId);
+            return routes.FirstOrDefault(r => r.Id == routeId);
+        }
+
+        private async Task SaveRouteToDbAsync(RouteInfo route)
+        {
+            var routes = await GetRoutesAsync();
+            
+            // Remove if exists (update scenario)
+            routes.RemoveAll(r => r.Id == route.Id);
+            routes.Add(route);
+            
+            var json = JsonSerializer.Serialize(routes, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            
+            await File.WriteAllTextAsync(_routesDbPath, json);
+        }
+
+        private async Task RemoveRouteFromDbAsync(string routeId)
+        {
+            var routes = await GetRoutesAsync();
+            routes.RemoveAll(r => r.Id == routeId);
+            
+            var json = JsonSerializer.Serialize(routes, new JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+            
+            await File.WriteAllTextAsync(_routesDbPath, json);
+        }
+
+        private async Task<bool> VerifyContainerAsync(string containerId)
+        {
+            try
+            {
+                var containers = await _dockerClient.Containers.ListContainersAsync(
+                    new ContainersListParameters { All = false });
+                
+                return containers.Any(c => 
+                    c.Names.Any(n => n.TrimStart('/') == containerId) || 
+                    c.ID.StartsWith(containerId));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task EnsureContainerNetworkAsync(string containerId)
+        {
+            try
+            {
+                var container = await _dockerClient.Containers.InspectContainerAsync(containerId);
+                var networks = container.NetworkSettings.Networks;
+
+                if (!networks.ContainsKey(TRAEFIK_NETWORK))
+                {
+                    await _dockerClient.Networks.ConnectNetworkAsync(
+                        TRAEFIK_NETWORK,
+                        new NetworkConnectParameters { Container = containerId });
+                    
+                    Console.WriteLine($"🔗 Connected {containerId} to {TRAEFIK_NETWORK}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️  Warning: Could not connect to network: {ex.Message}");
+            }
+        }
+
+        private string SanitizeString(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+            
+            // Replace dots and invalid characters with hyphens
+            return input.Replace(".", "-")
+                       .Replace("_", "-")
+                       .ToLower()
+                       .Trim('-');
+        }
+
+        public async Task<Dictionary<string, object>> GetStatsAsync(string userId = null)
+        {
+            var routes = await GetRoutesAsync(userId);
+            var containers = routes.Select(r => r.ContainerId).Distinct().Count();
+
+            return new Dictionary<string, object>
+            {
+                ["totalRoutes"] = routes.Count,
+                ["activeRoutes"] = routes.Count(r => r.Status == "active"),
+                ["containers"] = containers,
+                ["lastUpdated"] = DateTime.UtcNow
+            };
+        }
+    }
+
+    // ============= API CONTROLLERS =============
+    [ApiController]
+    [Route("api/expose")]
+    public class ExposePortController : ControllerBase
+    {
+        private readonly TraefikFileRouterService _routerService;
+
+        public ExposePortController(TraefikFileRouterService routerService)
+        {
+            _routerService = routerService;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExposePort([FromBody] ExposeRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.UserId))
+                {
+                    return BadRequest(new { error = "UserId is required" });
+                }
+
+                var response = await _routerService.ExposePortAsync(request);
+                return Ok(response);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error exposing port: {ex}");
+                return StatusCode(500, new { error = "Internal server error", details = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRoutes([FromQuery] string userId = null)
+        {
+            try
+            {
+                var routes = await _routerService.GetRoutesAsync(userId);
+                return Ok(routes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error getting routes: {ex}");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("{routeId}")]
+        public async Task<IActionResult> GetRoute(string routeId, [FromQuery] string userId = null)
+        {
+            try
+            {
+                var route = await _routerService.GetRouteByIdAsync(routeId, userId);
+                if (route == null)
+                {
+                    return NotFound(new { error = "Route not found" });
+                }
+                return Ok(route);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error getting route: {ex}");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpDelete("{routeId}")]
+        public async Task<IActionResult> DeleteRoute(string routeId, [FromQuery] string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return BadRequest(new { error = "UserId is required" });
+                }
+
+                var deleted = await _routerService.DeleteRouteAsync(routeId, userId);
+                if (!deleted)
+                {
+                    return NotFound(new { error = "Route not found" });
+                }
+
+                return Ok(new { message = "Route deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error deleting route: {ex}");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetStats([FromQuery] string userId = null)
+        {
+            try
+            {
+                var stats = await _routerService.GetStatsAsync(userId);
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error getting stats: {ex}");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+    }
+
+    // ============= PROGRAM STARTUP =============
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+
+            // Add controllers
+            builder.Services.AddControllers();
+            
+            // Add CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                });
+            });
+
+            // Register TraefikFileRouterService as singleton
+            builder.Services.AddSingleton(sp =>
+            {
+                var env = sp.GetRequiredService<IWebHostEnvironment>();
+                var dynamicPath = Path.Combine(env.ContentRootPath, "dynamic");
+                
+                return new TraefikFileRouterService(
+                    dockerHost: "unix:///var/run/docker.sock",
+                    domain: "dock8s.in",
+                    dynamicConfigPath: dynamicPath,
+                    useHttps: true
+                );
+            });
+
+            var app = builder.Build();
+
+            app.UseCors();
+            app.MapControllers();
+
+            // Health check endpoint
+            app.MapGet("/api/health", () => Results.Ok(new 
+            { 
+                status = "healthy",
+                service = "DinD Port Router",
+                timestamp = DateTime.UtcNow 
+            }));
+
+            Console.WriteLine("🚀 DinD Port Router API Started");
+            Console.WriteLine("📍 Listening on: http://localhost:5000");
+            Console.WriteLine("📁 Dynamic configs: ./dynamic/");
+            Console.WriteLine();
+            Console.WriteLine("Available Endpoints:");
+            Console.WriteLine("  POST   /api/expose          - Expose a port");
+            Console.WriteLine("  GET    /api/expose          - List all routes");
+            Console.WriteLine("  GET    /api/expose/{id}     - Get route details");
+            Console.WriteLine("  DELETE /api/expose/{id}     - Delete a route");
+            Console.WriteLine("  GET    /api/expose/stats    - Get statistics");
+            Console.WriteLine("  GET    /api/health          - Health check");
+
+            app.Run("http://localhost:5000");
+        }
+    }
+}

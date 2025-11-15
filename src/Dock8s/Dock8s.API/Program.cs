@@ -1,3 +1,4 @@
+using Dock8s.API.Controllers;
 using Dock8s.Application.SignalRHub;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,8 @@ var allowedOrigins = new[]
     "http://localhost:3000"
 };
 
+builder.Services.AddControllers();
+builder.Services.AddScoped<TraefikFileRouterService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -30,6 +33,7 @@ var app = builder.Build();
 app.UseRouting();
 app.UseCors("AllowFrontend");
 
+app.MapControllers();
 app.MapHub<TerminalHub>("/terminalhub").RequireCors("AllowFrontend");
 
 app.Run();
