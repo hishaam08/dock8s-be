@@ -17,7 +17,7 @@ namespace Dock8s.API.Controllers
     {
         public string UserId { get; set; }
         public int Port { get; set; }
-        public string? Subdomain { get; set; } // Optional custom subdomain
+        public string? Subdomain { get; set; }
     }
 
     public class RouteInfo
@@ -146,13 +146,52 @@ namespace Dock8s.API.Controllers
             return route;
         }
 
-        private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
-        {
-            var containerName = $"{userId}-dind";
-            var protocol = _useHttps ? "https" : "http";
-            var entryPoint = _useHttps ? "websecure" : "web";
+//         private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
+//         {
+//             var containerName = $"{userId}-dind";
+//             var protocol = _useHttps ? "https" : "http";
+//             var entryPoint = _useHttps ? "websecure" : "web";
 
-            var yaml = $@"http:
+//             var yaml = $@"http:
+//   routers:
+//     r-{routeId}:
+//       rule: ""Host(`{hostname}`)""
+//       service: ""s-{routeId}""
+//       entryPoints:
+//         - {entryPoint}";
+
+//             if (_useHttps)
+//             {
+//                 yaml += @"
+//       tls:
+//         certResolver: letsencrypt";
+//             }
+
+//             yaml += $@"
+
+//   services:
+//     s-{routeId}:
+//       loadBalancer: 
+//         servers:
+//           - url: ""http://{containerName}:{port}""
+// ";
+
+//             await File.WriteAllTextAsync(filePath, yaml);
+//             Console.WriteLine($"📝 Traefik config written: {filePath}");
+//         }
+
+private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
+{
+    var containerName = $"{userId}-dind";
+    var protocol = _useHttps ? "https" : "http";
+    var entryPoint = _useHttps ? "websecure" : "web";
+
+    // Extract parent domain for wildcard certificate
+    // Example: "app.user123.dock8s.in" -> parent = "user123.dock8s.in", wildcard = "*.user123.dock8s.in"
+    var parentDomain = GetParentDomain(hostname);
+    var wildcardDomain = $"*.{parentDomain}";
+
+    var yaml = $@"http:
   routers:
     r-{routeId}:
       rule: ""Host(`{hostname}`)""
@@ -160,14 +199,18 @@ namespace Dock8s.API.Controllers
       entryPoints:
         - {entryPoint}";
 
-            if (_useHttps)
-            {
-                yaml += @"
+    if (_useHttps)
+    {
+    yaml += $@"
       tls:
-        certResolver: letsencrypt";
-            }
+        certResolver: letsencrypt-dns
+        domains:
+          - main: ""{parentDomain}""
+            sans:
+              - ""{wildcardDomain}""";
+    }
 
-            yaml += $@"
+    yaml += $@"
 
   services:
     s-{routeId}:
@@ -176,9 +219,31 @@ namespace Dock8s.API.Controllers
           - url: ""http://{containerName}:{port}""
 ";
 
-            await File.WriteAllTextAsync(filePath, yaml);
-            Console.WriteLine($"📝 Traefik config written: {filePath}");
+    await File.WriteAllTextAsync(filePath, yaml);
+    Console.WriteLine($"📝 Traefik config written: {filePath}");
+    Console.WriteLine($"🔒 Wildcard certificate: {wildcardDomain}");
+}
+
+    private string GetParentDomain(string hostname)
+    {
+        // Extract parent domain from hostname
+        // Examples:
+        // "app.user123.dock8s.in" -> "user123.dock8s.in"
+        // "p8080.user123.dock8s.in" -> "user123.dock8s.in"
+        
+        var parts = hostname.Split('.');
+        
+        if (parts.Length < 3)
+        {
+            throw new ArgumentException($"Invalid hostname format: {hostname}");
         }
+        
+        // Remove the first subdomain part and return the rest
+        // For "app.user123.dock8s.in", skip "app" and return "user123.dock8s.in"
+        var parentDomain = string.Join(".", parts.Skip(1));
+        
+        return parentDomain;
+    }
 
         public async Task<bool> DeleteRouteAsync(string routeId, string userId)
         {
@@ -493,7 +558,7 @@ namespace Dock8s.API.Controllers
             Console.WriteLine("  GET    /api/expose/stats    - Get statistics");
             Console.WriteLine("  GET    /api/health          - Health check");
 
-            app.Run("http://localhost:5000");
+            app.Run("http://localhost:5295");
         }
     }
 }

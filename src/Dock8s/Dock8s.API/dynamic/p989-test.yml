@@ -1,0 +1,19 @@
+http:
+  routers:
+    r-p989-test:
+      rule: "Host(`p989.test.dock8s.in`)"
+      service: "s-p989-test"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt-dns
+        domains:
+          - main: "test.dock8s.in"
+            sans:
+              - "*.test.dock8s.in"
+
+  services:
+    s-p989-test:
+      loadBalancer: 
+        servers:
+          - url: "http://test-dind:989"
