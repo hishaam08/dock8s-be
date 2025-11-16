@@ -54,7 +54,7 @@ namespace Dock8s.API.Controllers
         public TraefikFileRouterService(
             string dockerHost = "tcp://localhost:2375",
             string domain = "dock8s.in",
-            string dynamicConfigPath = "./dynamic",
+            string dynamicConfigPath = "/dynamic",
             bool useHttps = true)
         {
             _dockerClient = new DockerClientConfiguration(new Uri(dockerHost)).CreateClient();
@@ -124,6 +124,7 @@ namespace Dock8s.API.Controllers
             // Generate Traefik YAML configuration
             var configPath = Path.Combine(_dynamicConfigPath, $"{routeId}.yml");
             await GenerateTraefikConfigAsync(routeId, hostname, request.Port, safeUserId, configPath);
+            await PrewarmCertificateAsync(hostname);
 
             // Save route to database
             var route = new RouteInfo
@@ -214,7 +215,7 @@ private async Task GenerateTraefikConfigAsync(string routeId, string hostname, i
 
   services:
     s-{routeId}:
-      loadBalancer: 
+      loadBalancer:
         servers:
           - url: ""http://{containerName}:{port}""
 ";
@@ -223,6 +224,34 @@ private async Task GenerateTraefikConfigAsync(string routeId, string hostname, i
     Console.WriteLine($"📝 Traefik config written: {filePath}");
     Console.WriteLine($"🔒 Wildcard certificate: {wildcardDomain}");
 }
+
+private async Task PrewarmCertificateAsync(string hostname)
+{
+    using var handler = new HttpClientHandler
+    {
+        // Accept self-signed during prewarm
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+    };
+
+    using var client = new HttpClient(handler)
+    {
+        Timeout = TimeSpan.FromSeconds(15) // DNS-01 usually 2–10 sec
+    };
+
+    var url = $"https://{hostname}";
+
+    try
+    {
+        Console.WriteLine($"🌡️ Prewarming TLS for {hostname}...");
+        await client.GetAsync(url);
+        Console.WriteLine($"🔥 Certificate ready for {hostname}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Prewarm failed for {hostname}: {ex.Message}");
+    }
+}
+
 
     private string GetParentDomain(string hostname)
     {
