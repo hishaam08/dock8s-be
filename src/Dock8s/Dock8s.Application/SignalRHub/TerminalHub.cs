@@ -25,21 +25,21 @@ namespace Dock8s.Application.SignalRHub
             try
             {
                 // Create exec instance with bash (fallback to sh if bash not available)
-                var exec = await _dockerClient.Exec.ExecCreateContainerAsync(containerId, new ContainerExecCreateParameters
-                {
-                    AttachStdout = true,
-                    AttachStderr = true,
-                    AttachStdin = true,
-                    Tty = true,
-                    Cmd = new[] { "/bin/sh" },
-                    Env = new[]
+                    var exec = await _dockerClient.Exec.ExecCreateContainerAsync(containerId, new ContainerExecCreateParameters
                     {
-                        "TERM=xterm-256color",
-                        "LANG=C.UTF-8",
-                        "PS1=\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ ",
-                        "LS_OPTIONS=--color=auto"
-                    }
-                });
+                        AttachStdout = true,
+                        AttachStderr = true,
+                        AttachStdin = true,
+                        Tty = true,
+                        Cmd = new[] { "/bin/sh" },
+                        Env = new[]
+                        {
+                            "TERM=xterm-256color",
+                            "LANG=C.UTF-8",
+                            "PS1=\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ ",
+                            "LS_OPTIONS=--color=auto"
+                        }
+                    });
 
                 var cts = new CancellationTokenSource();
                 _cancellationTokens[Context.ConnectionId] = cts;

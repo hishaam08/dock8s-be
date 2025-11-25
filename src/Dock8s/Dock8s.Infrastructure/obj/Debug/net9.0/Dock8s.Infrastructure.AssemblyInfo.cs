@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Dock8s.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+40648bb04ed236e3631aa9abe9674f318cd4e300")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c2db6c55dc0d5475f0014acbf1b2c59d72e3d612")]
 [assembly: System.Reflection.AssemblyProductAttribute("Dock8s.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Dock8s.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

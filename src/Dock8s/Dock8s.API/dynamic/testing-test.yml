@@ -1,0 +1,19 @@
+http:
+  routers:
+    r-hishaam-test:
+      rule: "Host(`main.hishaam.dock8s.in`)"
+      service: "s-hishaam-test"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt-dns
+        domains:
+          - main: "hishaam.dock8s.in"
+            sans:
+              - "*.hishaam.dock8s.in"
+
+  services:
+    s-hishaam-test:
+      loadBalancer:
+        servers:
+          - url: "http://test-dind:8010"

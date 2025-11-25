@@ -10,3 +10,4 @@ D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\refint\Doc
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.pdb
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\ref\Dock8s.Infrastructure.dll
 D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.sourcelink.json
+D:\dock8s\dock8s-be\src\Dock8s\Dock8s.Infrastructure\obj\Debug\net9.0\Dock8s.Infrastructure.csproj.AssemblyReference.cache

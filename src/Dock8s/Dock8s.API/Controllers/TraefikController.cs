@@ -49,7 +49,7 @@ namespace Dock8s.API.Controllers
         private readonly string _dynamicConfigPath;
         private readonly string _routesDbPath;
         private readonly bool _useHttps;
-        private const string TRAEFIK_NETWORK = "traefik-public";
+        private const string TRAEFIK_NETWORK = "traefik-network";
 
         public TraefikFileRouterService(
             string dockerHost = "tcp://localhost:2375",
@@ -91,14 +91,14 @@ namespace Dock8s.API.Controllers
             {
                 // Custom subdomain
                 var safeSubdomain = SanitizeString(request.Subdomain);
-                routeId = $"{safeSubdomain}-{safeUserId}";
-                hostname = $"{safeSubdomain}.{safeUserId}.{_domain}";
+                routeId = $"{safeSubdomain}-{request.UserId}";
+                hostname = $"{safeSubdomain}.{request.UserId}.{_domain}";
             }
             else
             {
                 // Port-based subdomain
-                routeId = $"p{request.Port}-{safeUserId}";
-                hostname = $"p{request.Port}.{safeUserId}.{_domain}";
+                routeId = $"p{request.Port}-{request.UserId}";
+                hostname = $"p{request.Port}.{request.UserId}.{_domain}";
             }
 
             // Check if route already exists
@@ -109,7 +109,7 @@ namespace Dock8s.API.Controllers
             }
 
             // Get container ID for user
-            var containerId = $"{safeUserId}-dind";
+            var containerId = $"dind-{request.UserId}";
             
             // Verify container exists and is running
             var containerExists = await VerifyContainerAsync(containerId);
@@ -147,43 +147,9 @@ namespace Dock8s.API.Controllers
             return route;
         }
 
-//         private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
-//         {
-//             var containerName = $"{userId}-dind";
-//             var protocol = _useHttps ? "https" : "http";
-//             var entryPoint = _useHttps ? "websecure" : "web";
-
-//             var yaml = $@"http:
-//   routers:
-//     r-{routeId}:
-//       rule: ""Host(`{hostname}`)""
-//       service: ""s-{routeId}""
-//       entryPoints:
-//         - {entryPoint}";
-
-//             if (_useHttps)
-//             {
-//                 yaml += @"
-//       tls:
-//         certResolver: letsencrypt";
-//             }
-
-//             yaml += $@"
-
-//   services:
-//     s-{routeId}:
-//       loadBalancer: 
-//         servers:
-//           - url: ""http://{containerName}:{port}""
-// ";
-
-//             await File.WriteAllTextAsync(filePath, yaml);
-//             Console.WriteLine($"📝 Traefik config written: {filePath}");
-//         }
-
 private async Task GenerateTraefikConfigAsync(string routeId, string hostname, int port, string userId, string filePath)
 {
-    var containerName = $"{userId}-dind";
+    var containerName = $"dind-{userId}";
     var protocol = _useHttps ? "https" : "http";
     var entryPoint = _useHttps ? "websecure" : "web";
 
