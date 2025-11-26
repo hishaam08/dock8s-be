@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Dock8s.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c2db6c55dc0d5475f0014acbf1b2c59d72e3d612")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b2f6ceb065d8d3b04c11e22c948b3a21823b497e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Dock8s.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Dock8s.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

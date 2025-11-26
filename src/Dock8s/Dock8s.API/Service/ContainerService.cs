@@ -199,7 +199,6 @@ namespace Dock8s.API.Service
                     // Update last activity
                     existingSession.LastActivityAt = DateTime.UtcNow;
                     await dbContext.SaveChangesAsync();
-
                     return MapToResponse(existingSession);
                 }
                 else
@@ -272,6 +271,12 @@ namespace Dock8s.API.Service
                 // Start container
                 await _dockerClient.Containers.StartContainerAsync(containerId, new ContainerStartParameters());
 
+                 var dockerdTask = WaitForDockerDaemonAsync(containerId);
+                var prewarmTask = PrewarmUserDomainAsync(userId);
+                
+                // Wait for both tasks to complete
+                await Task.WhenAll(dockerdTask, prewarmTask);
+
                 Console.WriteLine($"✅ Container created: {containerName} ({containerId})");
 
                 // Create session record
@@ -299,6 +304,65 @@ namespace Dock8s.API.Service
                 throw;
             }
         }
+
+        private async Task PrewarmUserDomainAsync(string userId)
+        {
+            try
+            {
+                Console.WriteLine($"🔥 Starting SSL prewarm for user: {userId}");
+                
+                // Create prewarm route configuration
+                await _routerService.CreatePrewarmRouteAsync(userId);
+                
+                Console.WriteLine($"✅ SSL prewarm completed for user: {userId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ SSL prewarm failed for user {userId}: {ex.Message}");
+                // Don't throw - this is a best-effort optimization
+            }
+        }
+
+        private async Task WaitForDockerDaemonAsync(string containerId)
+        {
+            var retries = 30;       // ~30 seconds max
+            var delay = 1000;       // 1 second between retries
+
+            for (int i = 0; i < retries; i++)
+            {
+                try
+                {
+                    var execCreate = await _dockerClient.Exec.ExecCreateContainerAsync(containerId,
+                        new ContainerExecCreateParameters
+                        {
+                            AttachStdout = true,
+                            AttachStderr = true,
+                            Cmd = new[] { "docker", "info" }
+                        });
+
+                    var stream = await _dockerClient.Exec.StartAndAttachContainerExecAsync(execCreate.ID, false);
+
+                    var output = await stream.ReadOutputToEndAsync(default);
+
+                    if (output.stdout.Contains("Server Version") ||
+                        output.stdout.Contains("Storage Driver"))
+                    {
+                        Console.WriteLine("🐳 dockerd is READY");
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Ignore — daemon not ready yet
+                }
+
+                Console.WriteLine("⏳ Waiting for dockerd inside DinD...");
+                await Task.Delay(delay);
+            }
+
+            throw new Exception("Timed out waiting for dockerd to become ready in DinD container");
+        }
+
 
         public async Task<bool> ExtendSessionAsync(string jwtToken, int additionalMinutes)
         {

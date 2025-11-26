@@ -1,0 +1,19 @@
+http:
+  routers:
+    r-prewarm-bb390e0a-dd72-40bc-853a-a54121229989:
+      rule: "Host(`bb390e0a-dd72-40bc-853a-a54121229989.dock8s.in`)"
+      service: "s-prewarm-bb390e0a-dd72-40bc-853a-a54121229989"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt-dns
+        domains:
+          - main: "bb390e0a-dd72-40bc-853a-a54121229989.dock8s.in"
+            sans:
+              - "*.bb390e0a-dd72-40bc-853a-a54121229989.dock8s.in"
+
+  services:
+    s-prewarm-bb390e0a-dd72-40bc-853a-a54121229989:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:1"
